@@ -27,6 +27,6 @@ char* strslice(char* fromstr, int start, int end) {
     }
 
     char* lenstr = malloc((end - start + 1) * sizeof(char));
-    memcpy(lenstr, fromstr+start, end-start);
+    memcpy(lenstr, fromstr + start, end - start);
     return lenstr;
 }

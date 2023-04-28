@@ -31,9 +31,9 @@ int main(int argc, char** argv) {
     // run_strslice_tests();
     // run_str_to_cmd_tests();
     // run_cmd_to_str_tests();
-    // run_is_valid_cmd_tests();
+    run_is_valid_cmd_tests();
     // run_read_command_str_tests();
-    run_send_command_msg_tests();
+    // run_send_command_msg_tests();
     
 
     return 0;
@@ -172,9 +172,15 @@ void run_cmd_to_str_tests() {
 }
 
 void test_is_valid_cmd(struct command cmd) {
+    char* err = malloc(1000);
+
     printf("\n********* is_valid_cmd input *********\n");
     display_cmd(cmd);
-    printf("Result: %s\n", is_valid_cmd(cmd) ? "valid" : "invalid");
+    printf("Result: %s\n", is_valid_cmd(cmd, err) ? "valid" : "invalid");
+    if (strlen(err) > 0) {
+        printf("Error message: %s\n", err);
+    }
+    free(err);
 }
 
 void run_is_valid_cmd_tests() {

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include "command.h"
 #include "pres_layer.h"
 #include "common.h"
 #include "config.h"
@@ -10,10 +11,10 @@
 
 
 // Command validation tools
-int has_n_args(struct command, int);
-int is_draw_type(char*);
-int is_role(char*);
-int is_cell(char*);
+int has_n_args(struct command, int, char*);
+int is_draw_type(char*, char*);
+int is_role(char*, char*);
+int is_cell(char*, char*);
 
 // Miscellaneous helper functions
 int get_pre_len(char*);
@@ -99,16 +100,18 @@ void display_cmd(struct command cmd) {
 // Returns true if arguments of provided command are valid based on its code value.
 // Validating commands is only intended to be used by the server, and only accepts
 // legal client calls as a result--server commands always return false.
-int is_valid_cmd(struct command cmd) {
+// Stores any relevent feedback message to err.
+int is_valid_cmd(struct command cmd, char* err) {
+    memset(err, 0, strlen(err));
     switch(cmd.code) {
         case PLAY:
-            return has_n_args(cmd, 1);
+            return has_n_args(cmd, 1, err);
         case MOVE:
-            return has_n_args(cmd, 2) && is_role(cmd.arg1) && is_cell(cmd.arg2);
+            return has_n_args(cmd, 2, err) && is_role(cmd.arg1, err) && is_cell(cmd.arg2, err);
         case RSGN:
-            return has_n_args(cmd, 0);
+            return has_n_args(cmd, 0, err);
         case DRAW:
-            return has_n_args(cmd, 1) && is_draw_type(cmd.arg1);
+            return has_n_args(cmd, 1, err) && is_draw_type(cmd.arg1, err);
         // case BEGN:
         // case MOVD:
         // case INVL:
@@ -118,11 +121,10 @@ int is_valid_cmd(struct command cmd) {
         default:
             return 0;
     }
-    return 1;
 }
 
 // Returns true if cmd has precisely n arguments
-int has_n_args(struct command cmd, int n) {
+int has_n_args(struct command cmd, int n, char* err_msg) {
     char* args[3] = {cmd.arg1, cmd.arg2, cmd.arg3};
 
     if (n < 0 || n > 3) {
@@ -132,10 +134,12 @@ int has_n_args(struct command cmd, int n) {
     for (int i=0; i<3; ++i) {
         // First n must not be NULL
         if (args[i] == NULL && i < n) {
+            sprintf(err_msg, "%s must have precisely %d args", code_to_str(cmd.code), n);
             return 0;
         }
         // Remaining 3-n must be NULL
         if (args[i] != NULL && i >= n) {
+            sprintf(err_msg, "%s must have precisely %d args", code_to_str(cmd.code), n);
             return 0;
         }
     }
@@ -143,38 +147,60 @@ int has_n_args(struct command cmd, int n) {
     return 1;
 }
 
-int is_draw_type(char* arg) {
+int is_draw_type(char* arg, char* err_msg) {
+    int ret = 1;
+
     if (arg == NULL || strlen(arg) != 1) {
-        return 0;
+        ret = 0;
+    } else if (arg[0] != 'S' && arg[0] != 'A' && arg[0] != 'R') {
+        ret = 0;
     }
-    return arg[0] == 'S' || arg[0] == 'A' || arg[0] == 'R';
+
+    if (ret == 0) {
+        sprintf(err_msg, "'%s' is not a valid type of draw response. Choose 'S', 'R' or 'A'", arg);
+    }
+
+    return ret;
 }
 
-int is_role(char* arg) {
+int is_role(char* arg, char* err_msg) {
+    int ret = 1;
+    memcpy(err_msg, 0, strlen(err_msg));
     if (arg == NULL || strlen(arg) != 1) {
-        return 0;
+        ret = 0;
+    } else if (arg[0] != 'X' && arg[0] != 'O') {
+        ret = 0;
     }
-    return arg[0] == 'X' || arg[0] == 'O';
+    
+    if (ret == 0) {
+        sprintf(err_msg, "'%s' us not a valid player role. Choose 'X' or 'O'", arg);
+    }
+    return ret;
 }
 
-int is_cell(char* arg) {
+int is_cell(char* arg, char* err_msg) {
+    int ret = 1;
+    memcpy(err_msg, 0, strlen(err_msg));
     // Must be exactly 3 characters
     if (arg == NULL || strlen(arg) != 3) {
-        return 0;
+        ret = 0;
     }
     // First char must be 1, 2 or 3
-    if (arg[0] != '1' && arg[0] != '2' && arg[0] != '3') {
-        return 0;
+    else if (arg[0] != '1' && arg[0] != '2' && arg[0] != '3') {
+        ret = 0;
     }
     // Second char must be a comma
-    if (arg[1] != ',') {
-        return 0;
+    else if (arg[1] != ',') {
+        ret = 0;
     }
     // Third char must be 1, 2 or 3
-    if (arg[2] != '1' && arg[2] != '2' && arg[2] != '3') {
-        return 0;
+    else if (arg[2] != '1' && arg[2] != '2' && arg[2] != '3') {
+        ret = 0;
     }
 
+    if (ret == 0) {
+        sprintf(err_msg, "'%s' is not a valid cell choice. Must be in format 'r,c', with r,c in {1,2,3}", arg);
+    }
     return 1;
 }
 
@@ -245,7 +271,7 @@ trans_code read_command(int fd, struct command* cmd, char* leftovers, char* errm
         bufsize = MAX_DATA_PACKET_SIZE;
     }
 
-    // clean out leftovers and errmsg for filling with data
+    // clean out leftovers and errmsg for filling with fresh data
     memset(leftovers, 0, strlen(leftovers));
     memset(errmsg, 0, strlen(errmsg));
 
@@ -317,10 +343,11 @@ int send_command_msg(int fd, char* cmdstr, int max_packet_size) {
     return 0;
 }
 
-// Attempts to send command in message format to specified file descriptor. Returns -1 if this fails, 0 otherwise.
-int send_command(int client_fd, struct command cmd) {
+// Attempts to send command in message format to specified file descriptor. 
+// Returns SEND_FAILED if this fails, TRANS_OK otherwise.
+trans_code send_command(int client_fd, struct command cmd) {
     char* cmdstr = cmd_to_str(cmd);
     int send_code = send_command_msg(client_fd, cmdstr, MAX_DATA_PACKET_SIZE);
     free(cmdstr);
-    return send_code;
+    return send_code ? SEND_FAILED : TRANS_OK;
 }
