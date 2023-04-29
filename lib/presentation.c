@@ -243,8 +243,6 @@ int read_command_str(int fd, char* buf, int bufsize, char* leftovers) {
         }
     }
 
-    printf("Handling spillover. Current buf: '%s'\n", buf);
-
     // if there was spillover, store the extra data in leftovers and clear it from buf
     if (totlen > explen) {
         strcpy(leftovers, buf + explen);
