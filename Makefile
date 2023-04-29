@@ -40,5 +40,5 @@ run_server:
 
 .PHONY: test
 test:
-	clang -o $(BINDIR)/testc src/testc.c lib/*.c
+	clang -o $(BINDIR)/testc src/testc.c lib/*.c lib/test/*.c
 	./$(BINDIR)/testc

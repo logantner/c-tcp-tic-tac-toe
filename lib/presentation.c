@@ -4,7 +4,7 @@
 #include <unistd.h>
 
 #include "command.h"
-#include "pres_layer.h"
+#include "presentation.h"
 #include "common.h"
 #include "config.h"
 
@@ -18,7 +18,7 @@ int is_cell(char*, char*);
 
 // Miscellaneous helper functions
 int get_pre_len(char*);
-int read_msg_part(int, char*, int*, int*);
+int read_msg_part(int, char**, int*, int*);
 
 
 // Parses and returns the command length from unparsed message string.
@@ -215,10 +215,10 @@ int read_command_str(int fd, char* buf, int bufsize, char* leftovers) {
     int totlen = strlen(buf);                // the current length of the string stored in buf
     int argslen = get_cmd_len(buf, totlen);  // the args length parsed from the 2nd field of the message
     int explen;                              // the expected length once the message is totally read
-    
+
     // keep reading until we are able to parse the args length
     while (argslen == -1) {
-        bytes_read = read_msg_part(fd, buf, &bufsize, &totlen);
+        bytes_read = read_msg_part(fd, &buf, &bufsize, &totlen);
 
         if (bytes_read <= 0) {
             // The connection has closed or failed: abort
@@ -231,19 +231,19 @@ int read_command_str(int fd, char* buf, int bufsize, char* leftovers) {
     if (argslen == -2) {
         return -1;
     }
-
     // We are now aware of how long the message is expected to be
     explen = get_pre_len(buf) + argslen;
 
     // keep reading until msg length equals or exceeds expected length
     while (totlen < explen) {
-        bytes_read = read_msg_part(fd, buf, &bufsize, &totlen);
-
+        bytes_read = read_msg_part(fd, &buf, &bufsize, &totlen);
         if (bytes_read <= 0) {
             // The connection has closed or failed: abort
             return bytes_read;
         }
     }
+
+    printf("Handling spillover. Current buf: '%s'\n", buf);
 
     // if there was spillover, store the extra data in leftovers and clear it from buf
     if (totlen > explen) {
@@ -260,7 +260,8 @@ int read_command_str(int fd, char* buf, int bufsize, char* leftovers) {
 // be contained in the leftovers data.
 // Returns a read code indicating the type of issue encountered.
 // In the event that READ_INVL_MSG is returned, a more specific error message is saved to errmsg
-// TODO: Test and debug this
+//
+// TIP: free_cmd(cmd) should be called exactly once for each time read_command(...) is called
 trans_code read_command(int fd, struct command* cmd, char* leftovers, char* errmsg) {
 
     // copy starting_str into sufficiently large buffer
@@ -294,20 +295,20 @@ trans_code read_command(int fd, struct command* cmd, char* leftovers, char* errm
 
 // Reads whatever message part is available from fd stream into buf, realloc'ing and updating 
 // the buffer size and string length as needed
-int read_msg_part(int fd, char* buf, int* bufsize, int* curlen) {
+int read_msg_part(int fd, char** buf, int* bufsize, int* curlen) {
     int totlen = *curlen;
 
     // expand buf if needed
     if (totlen == *bufsize) {
         *bufsize *= 2;
-        buf = realloc(buf, (*bufsize + 1) * sizeof(char));
+        *buf = realloc(*buf, (*bufsize + 1) * sizeof(char));
     }
 
-    int bytes_read = read(fd, buf+totlen, *bufsize-totlen);
+    int bytes_read = read(fd, *buf+totlen, *bufsize-totlen);
 
     // remove linebreak when testing using stdin. Can ignore otherwise
-    if (fd == STDIN_FILENO && bytes_read > 0 && buf[totlen + bytes_read - 1] == '\n') {
-        buf[totlen + bytes_read - 1] = 0;
+    if (fd == STDIN_FILENO && bytes_read > 0 && (*buf)[totlen + bytes_read - 1] == '\n') {
+        (*buf)[totlen + bytes_read - 1] = 0;
         --bytes_read;
     }
 
@@ -333,7 +334,7 @@ int send_command_msg(int fd, char* cmdstr, int max_packet_size) {
 
         int bytes_sent = write(fd, cmdstr + tot_bytes_sent, packet_size);
         if (bytes_sent <= 0) {
-            fprintf(stderr, "Failed to send message\n");
+            fprintf(stderr, "Failed to send message to fd %d\n", fd);
             return -1;
         }
 
@@ -350,4 +351,21 @@ trans_code send_command(int client_fd, struct command cmd) {
     int send_code = send_command_msg(client_fd, cmdstr, MAX_DATA_PACKET_SIZE);
     free(cmdstr);
     return send_code ? SEND_FAILED : TRANS_OK;
+}
+
+char* trans_code_to_str(trans_code tcode) {
+    switch(tcode) {
+        case TRANS_OK:
+            return "TRANS_OK";
+        case READ_OK_INVL_CMD:
+            return "READ_OK_INVL_CMD";
+        case READ_CONN_CLOSED:
+            return "READ_CONN_CLOSED";
+        case READ_CONN_FAILED:
+            return "READ_CONN_FAILED";
+        case READ_INVL_MSG:
+            return "READ_INVL_MSG";
+        case SEND_FAILED:
+            return "SEND_FAILED";
+    }
 }

@@ -3,11 +3,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "game.h"
+#include "presentation.h"
 #include "server_application.h"
-#include "pres_layer.h"
 #include "command.h"
 #include "config.h"
-#include "game.h"
+
 
 trans_code get_player_response(struct command*, struct player*, struct ttt_game);
 void end_game(struct ttt_game, int);
@@ -18,10 +19,6 @@ trans_code process_move(struct command, struct ttt_game*, struct player*);
 trans_code process_draw_req(struct command, struct ttt_game*, struct player*);
 trans_code process_bad_context(struct command, struct player);
 void handle_trans_failure(int, struct ttt_game, struct player);
-
-// void set_up_game(int client_fd1, int client_fd2) {
-
-// }
 
 // Send BEGN to both players
 // Wait to receive response from current player: <----------------------------------------------+
@@ -42,7 +39,9 @@ void handle_trans_failure(int, struct ttt_game, struct player);
 trans_code moderate_game(struct ttt_game game) {
     trans_code tcode = TRANS_OK;
     struct command in_cmd;
-    struct player cur_p = game.p1;
+    struct player cur_p = game.p1;  // p1 always goes first
+
+    game.is_active = 1;
 
     // Start game
     if (  send_command(game.p1.fd, new_begn_cmd("X")) == SEND_FAILED || 
@@ -53,19 +52,18 @@ trans_code moderate_game(struct ttt_game game) {
 
     while (game.is_active) {
         tcode = get_player_response(&in_cmd, &cur_p, game);
-        if (tcode != TRANS_OK) {
-            free_cmd(in_cmd);
-            continue;
-        }
         
-        if (in_cmd.code == MOVE) {
-            tcode = process_move(in_cmd, &game, &cur_p);
-        } else if (in_cmd.code == RSGN) {
-            tcode = process_resignation(in_cmd, &game, cur_p);
-        } else if (in_cmd.code == DRAW) {
-            tcode = process_draw_req(in_cmd, &game, &cur_p);
-        } else {
-            tcode = process_bad_context(in_cmd, cur_p);
+        if (tcode == TRANS_OK) {
+            // The transmission succeeded - process the command
+            if (in_cmd.code == MOVE) {
+                tcode = process_move(in_cmd, &game, &cur_p);
+            } else if (in_cmd.code == RSGN) {
+                tcode = process_resignation(in_cmd, &game, cur_p);
+            } else if (in_cmd.code == DRAW) {
+                tcode = process_draw_req(in_cmd, &game, &cur_p);
+            } else {
+                tcode = process_bad_context(in_cmd, cur_p);
+            }
         }
         
         if (tcode != TRANS_OK && tcode != READ_OK_INVL_CMD) {
@@ -79,10 +77,46 @@ trans_code moderate_game(struct ttt_game game) {
     return tcode;
 }
 
+// Given the fd to a current connection, attempts to query client for name.
+// If successful, client/name is assigned to an unassigned player of game.
+// Otherwise, a bad trans_code is returned and no player is assigned.
+trans_code process_new_player(int fd, struct ttt_game new_game) {
+    struct player p = new_player();
+    p.fd = fd;
+
+    trans_code tcode;
+    struct command in_cmd;
+    int done = 0;
+    while (!done) {
+        tcode = get_player_response(&in_cmd, &p, new_game);
+        if (tcode == TRANS_OK) {
+            if (in_cmd.code == PLAY) {
+                add_player(new_game, p, in_cmd.arg1);
+                done = 1;
+            } else {
+                // Bad context command received - complain and query again
+                tcode = process_bad_context(in_cmd, p);
+            }
+        }
+
+        if (tcode != TRANS_OK && tcode != READ_OK_INVL_CMD) {
+            // trans error has occured; abort
+            done = 1;
+        }
+
+        free_cmd(in_cmd);
+    }
+    return tcode;
+}
+
 trans_code process_move(struct command move_cmd, struct ttt_game* game, struct player* cur_p) {
     char role = move_cmd.arg1[0];
     int row = move_cmd.arg2[0] - '0';
     int col = move_cmd.arg2[2] - '0';
+
+    if (role != cur_p->role) {
+        return send_command(cur_p->fd, new_invl_cmd("Attempted to move using your opponent's role"));
+    }
 
     char space = get_board_val(*game, row, col);
     if (space == '.') {
@@ -211,14 +245,12 @@ void handle_trans_failure(int tcode, struct ttt_game game, struct player cur_p) 
     }
 }
 
-// void end_game(struct ttt_game game, int err_code) {
-//     if (err_code < 0) {
-//         // Do some extra stuff
-//     }
-
-//     close(game.p1.fd);
-//     close(game.p2.fd);
-// }
+void post_game_cleanup(struct ttt_game game) {
+    free_player(game.p1);
+    free_player(game.p2);
+    close(game.p1.fd);
+    close(game.p2.fd);
+}
 
 // Toggles player *p to point to their opponent
 void toggle_player(struct player* p, struct ttt_game game) {
@@ -242,11 +274,14 @@ trans_code get_player_response(struct command* in_cmd, struct player* p, struct 
     if (tcode == READ_INVL_MSG) {
         // This is a presentation error. We cannot safely read any more messages from the player
         char invl_msg[1000];
-        sprintf(invl_msg, "Your message could not even be parsed: '%s'\nEnding game and closing connection", err_msg);
+        sprintf(invl_msg, "Your message could not even be parsed: '%s'\nClosing the connection", err_msg);
         send_command(p->fd, new_invl_cmd(invl_msg));
 
-        toggle_player(p, game);
-        send_command(p->fd, new_over_cmd("D", "Your opponent had a connection issue. Let's call this one a draw."));
+        // Only do this if a game has actually been started (not if we are querying a new player for their name)
+        if (game.is_active) {
+            toggle_player(p, game);
+            send_command(p->fd, new_over_cmd("D", "Your opponent had a connection issue. Let's call this one a draw."));
+        }
     }
 
     

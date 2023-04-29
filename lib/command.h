@@ -2,7 +2,6 @@
 #define COMMAND_H_
 
 typedef enum {
-    BADV = -1,  // placeholder for invalid command codes
     PLAY = 0,
     MOVE = 1,
     RSGN = 2,
@@ -11,7 +10,8 @@ typedef enum {
     BEGN = 5,
     MOVD = 6,
     INVL = 7,
-    OVER = 8
+    OVER = 8,
+    BADV = 9,  // placeholder for invalid command codes
 } cmd_code;
 
 struct command {

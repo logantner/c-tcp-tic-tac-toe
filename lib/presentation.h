@@ -1,5 +1,5 @@
-#ifndef PRES_LAYER_H
-#define PRES_LAYER_H
+#ifndef PRESENTATION_H
+#define PRESENTATION_H
 
 #include "command.h"
 
@@ -18,6 +18,7 @@ int read_command_str(int, char*, int, char*);
 trans_code read_command(int, struct command*, char*, char*);
 int send_command_msg(int, char*, int);
 trans_code send_command(int, struct command);
+char* trans_code_to_str(trans_code);
 
 // other command/code functions
 int get_cmd_len(char*, int);

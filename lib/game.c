@@ -1,29 +1,66 @@
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "game.h"
+#include "config.h"
 
 char check_win_condition(struct ttt_game, int, int, int);
 int is_board_full(struct ttt_game);
 
 
-struct ttt_game new_game(struct player p1, struct player p2) {
+struct ttt_game new_game() {
     struct ttt_game game;
 
     strcpy(game.board, ".........");
+    game.is_active = 0;
+    game.p1 = new_player();
+    game.p2 = new_player();
 
-    // Randomly assign who will be going first
-    if (rand() % 2 == 0) {
-        game.p1 = p1;
-        game.p2 = p2;
-    } else {
-        game.p2 = p1;
-        game.p1 = p2;
-    }
-
-    game.is_active = 1;
+    game.p1.role = 'X';
+    game.p2.role = 'O';
 
     return game;
+}
+
+struct player new_player() {
+    struct player p;
+    memset(&p, 0, sizeof(struct player));
+    char msg_fragment[MAX_DATA_PACKET_SIZE];
+    p.fd = 0;
+    p.msg_fragment = msg_fragment;
+
+    return p;
+}
+
+
+void free_player(struct player p) {
+    if (p.name != NULL) {
+        free(p.name);
+        p.name = NULL;
+    }
+}
+
+// Assigns fd, message fragments, and player name to a game player (randomly if two options are available)
+void add_player(struct ttt_game game, struct player newp, char* pname) {
+    struct player p;
+
+    if (game.p1.fd != 0) {
+        p = game.p2;
+    } else if (game.p2.fd != 0) {
+        p = game.p1;
+    } else {
+        // Randomly assign who will be going first
+        p = (rand() % 2 == 0) ? game.p1 : game.p2;
+    }
+
+    p.fd = newp.fd;
+    strcpy(p.msg_fragment, newp.msg_fragment);
+    p.name = strdup(pname);
+}
+
+int num_players(struct ttt_game game) {
+    return (game.p1.fd != 0) + (game.p2.fd != 0);
 }
 
 char get_board_val(struct ttt_game game, int r, int c) {
@@ -82,4 +119,20 @@ int is_board_full(struct ttt_game game) {
         }
     }
     return 1;
+}
+
+void displayBoard(char board[10]) {
+    for (int i=0; i<3; ++i) {
+        if (i == 0) {
+            printf("+-----------+\n");
+        } else {
+            printf("|---+---+---|\n");
+        }
+        
+        for (int j=0; j<3; ++j) {
+            printf("| %c ", board[3*i + j]);
+        }
+        printf("|\n");
+    }
+    printf("+-----------+\n");
 }

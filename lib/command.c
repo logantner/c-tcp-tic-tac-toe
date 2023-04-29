@@ -5,7 +5,7 @@
 #include "command.h"
 #include "common.h"
 
-char* const cmd_code_names[9] = {
+char* const cmd_code_names[10] = {
     "PLAY",
     "MOVE",
     "RSGN",
@@ -14,7 +14,8 @@ char* const cmd_code_names[9] = {
     "BEGN",
     "MOVD",
     "INVL",
-    "OVER"
+    "OVER",
+    "BADV"
 };
 
 
@@ -42,7 +43,8 @@ int get_pre_len(char* msg) {
 int str_to_cmd(char* cmdstr, int strlen, struct command* cmd, char* errmsg) {
 
     // clear out the contents of the command
-    memset(cmd, 0, sizeof(struct command));
+    *cmd = new_cmd();
+    // memset(cmd, 0, sizeof(struct command));
 
     // get and validate command code
     cmd_code code = get_code(cmdstr);
@@ -128,7 +130,7 @@ char* cmd_to_str(struct command cmd) {
 
 char* code_to_str(cmd_code code) {
     char ret[5];
-    if (code < 0 || code > 8) {
+    if (code < 0 || code > 9) {
         return NULL;
     }
 
@@ -141,12 +143,15 @@ char* code_to_str(cmd_code code) {
 void free_cmd(struct command cmd) {
     if (cmd.arg1 != NULL) {
         free(cmd.arg1);
+        cmd.arg1 = NULL;
     }
     if (cmd.arg2 != NULL) {
         free(cmd.arg2);
+        cmd.arg2 = NULL;
     }
     if (cmd.arg3 != NULL) {
         free(cmd.arg3);
+        cmd.arg3 = NULL;
     }
 }
 
@@ -154,6 +159,7 @@ void free_cmd(struct command cmd) {
 struct command new_cmd() {
     struct command cmd;
     memset(&cmd, 0, sizeof(struct command));
+    cmd.code = BADV;
     return cmd;
 }
 

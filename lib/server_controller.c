@@ -7,6 +7,9 @@
 #include <arpa/inet.h>
 
 #include "config.h"
+#include "game.h"
+#include "presentation.h"
+#include "server_application.h"
 
 int create_listening_socket();
 int extract_port(const struct addrinfo* const);
@@ -28,12 +31,34 @@ int run_server() {
     struct sockaddr_storage client_addr;
     socklen_t client_addr_size;
     int client_sockfd;
+
+    struct ttt_game game = new_game();
+    trans_code tcode;
     while(1) {
         client_addr_size = sizeof(client_addr);
         client_sockfd = accept(conn_sockfd, (struct sockaddr *)&client_addr, &client_addr_size);
         printf("Received client with fd value %d\n", client_sockfd);
 
-        talk_to_client(client_sockfd);
+        /////////////////////
+        // Modularize this //
+        /////////////////////
+
+        tcode = process_new_player(client_sockfd, game);
+        if (tcode != TRANS_OK) {
+            printf("There were problems with the client at socket %d. Disconnecting...", client_sockfd);
+            close(client_sockfd);
+        }
+
+        if (num_players(game) == 2) {
+            printf("Players at ports %d and %d have been matched to a game.\n", game.p1.fd, game.p2.fd);
+            tcode = moderate_game(game);
+        }
+
+        post_game_cleanup(game);
+
+        /////////////////////
+        /////////////////////
+        /////////////////////
     }
 
     return 0;
