@@ -43,18 +43,21 @@ int run_server() {
         // Modularize this //
         /////////////////////
 
-        tcode = process_new_player(client_sockfd, game);
+        tcode = process_new_player(client_sockfd, &game);
         if (tcode != TRANS_OK) {
             printf("There were problems with the client at socket %d. Disconnecting...", client_sockfd);
             close(client_sockfd);
         }
 
+        printf("The current game has %d players\n", num_players(game));
+
         if (num_players(game) == 2) {
             printf("Players at ports %d and %d have been matched to a game.\n", game.p1.fd, game.p2.fd);
             tcode = moderate_game(game);
+            post_game_cleanup(game);
         }
 
-        post_game_cleanup(game);
+        
 
         /////////////////////
         /////////////////////
@@ -81,9 +84,8 @@ int create_listening_socket() {
     struct addrinfo* info;
     int sockfd;
     for (info = info_list; info != NULL; info = info->ai_next) {
-        // if (info->ai_family == AF_INET6) {
-        //     continue;
-        // }
+        printf("=== Attempting to connect to the following socket:\n");
+        // display_addrinfo(info);
 
         // create socket
         sockfd = socket(info->ai_family, info->ai_socktype, info->ai_protocol);

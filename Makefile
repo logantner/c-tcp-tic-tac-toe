@@ -13,11 +13,11 @@ BINDIR=bin
 
 # Define a default target, to be built when invoking make
 .PHONY: all
-all: clean $(PNAME1) $(PNAME2) test
+all: clean $(PNAME1) $(PNAME2)
 	
 # Define how to compile main
 $(PNAME1): src/$(PNAME1).$(EXT)
-	clang -o $(BINDIR)/$(PNAME1) src/$(PNAME1).${EXT} lib/*.c
+	clang -o $(BINDIR)/$(PNAME1) src/$(PNAME1).${EXT} lib/*.c 
 
 # ${DEP1}.c ${DEP3}.c
 

@@ -254,6 +254,10 @@ int read_command_str(int fd, char* buf, int bufsize, char* leftovers) {
 //
 // TIP: free_cmd(cmd) should be called exactly once for each time read_command(...) is called
 trans_code read_command(int fd, struct command* cmd, char* leftovers, char* errmsg) {
+    if (errmsg == NULL) {
+        char temp_errmsg[300];
+        errmsg = temp_errmsg;
+    }
 
     // copy starting_str into sufficiently large buffer
     char* cmdstr = strdup(leftovers);

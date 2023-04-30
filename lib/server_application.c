@@ -80,7 +80,7 @@ trans_code moderate_game(struct ttt_game game) {
 // Given the fd to a current connection, attempts to query client for name.
 // If successful, client/name is assigned to an unassigned player of game.
 // Otherwise, a bad trans_code is returned and no player is assigned.
-trans_code process_new_player(int fd, struct ttt_game new_game) {
+trans_code process_new_player(int fd, struct ttt_game* game) {
     struct player p = new_player();
     p.fd = fd;
 
@@ -88,10 +88,11 @@ trans_code process_new_player(int fd, struct ttt_game new_game) {
     struct command in_cmd;
     int done = 0;
     while (!done) {
-        tcode = get_player_response(&in_cmd, &p, new_game);
+        tcode = get_player_response(&in_cmd, &p, *game);
         if (tcode == TRANS_OK) {
             if (in_cmd.code == PLAY) {
-                add_player(&new_game, p, in_cmd.arg1);
+                add_player(game, p, in_cmd.arg1);
+                printf("Paired a client to an open game!\n");
                 done = 1;
             } else {
                 // Bad context command received - complain and query again
@@ -106,6 +107,15 @@ trans_code process_new_player(int fd, struct ttt_game new_game) {
 
         free_cmd(in_cmd);
     }
+
+    // Tell successfully added player to wait until game is set up
+    tcode = send_command(fd, new_wait_cmd());
+    if (tcode == SEND_FAILED) {
+        // TODO: add a remove player function and invoke it here
+    } else {
+        printf("Sent WAIT to player\n");
+    }
+
     return tcode;
 }
 
