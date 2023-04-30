@@ -26,9 +26,8 @@ struct ttt_game new_game() {
 struct player new_player() {
     struct player p;
     memset(&p, 0, sizeof(struct player));
-    char msg_fragment[MAX_DATA_PACKET_SIZE];
     p.fd = 0;
-    p.msg_fragment = msg_fragment;
+    p.msg_fragment = malloc((MAX_DATA_PACKET_SIZE+1) * sizeof(char));
 
     return p;
 }
@@ -39,24 +38,31 @@ void free_player(struct player p) {
         free(p.name);
         p.name = NULL;
     }
+
+    if (p.msg_fragment != NULL) {
+        free(p.msg_fragment);
+        p.msg_fragment = NULL;
+    }
 }
 
 // Assigns fd, message fragments, and player name to a game player (randomly if two options are available)
-void add_player(struct ttt_game game, struct player newp, char* pname) {
-    struct player p;
-
-    if (game.p1.fd != 0) {
-        p = game.p2;
-    } else if (game.p2.fd != 0) {
-        p = game.p1;
-    } else {
-        // Randomly assign who will be going first
-        p = (rand() % 2 == 0) ? game.p1 : game.p2;
+void add_player(struct ttt_game* game, struct player newp, char* pname) {
+    struct player* p;
+    
+    // If one player is assigned, choose the other
+    if (game->p1.fd != 0) {
+        p = &(game->p2);
+    } else if (game->p2.fd != 0) {
+        p = &(game->p1);
+    } 
+    // Otherwise, randomly assign who will be going first
+    else {
+        p = (rand() % 2 == 0) ? &(game->p1) : &(game->p2);
     }
-
-    p.fd = newp.fd;
-    strcpy(p.msg_fragment, newp.msg_fragment);
-    p.name = strdup(pname);
+    
+    p->fd = newp.fd;
+    strcpy(p->msg_fragment, newp.msg_fragment);
+    p->name = strdup(pname);
 }
 
 int num_players(struct ttt_game game) {
@@ -68,9 +74,9 @@ char get_board_val(struct ttt_game game, int r, int c) {
     return game.board[flat_coord];
 }
 
-void set_board_val(struct ttt_game game, int r, int c, char role) {
+void set_board_val(struct ttt_game* game, int r, int c, char role) {
     int flat_coord = 3 * (r-1) + (c-1);
-    game.board[flat_coord] = role;
+    game->board[flat_coord] = role;
 }
 
 // Returns a string representation of the winner if one has been declared, "T" if the
@@ -121,7 +127,7 @@ int is_board_full(struct ttt_game game) {
     return 1;
 }
 
-void displayBoard(char board[10]) {
+void display_board(char board[10]) {
     for (int i=0; i<3; ++i) {
         if (i == 0) {
             printf("+-----------+\n");
@@ -135,4 +141,14 @@ void displayBoard(char board[10]) {
         printf("|\n");
     }
     printf("+-----------+\n");
+}
+
+void display_player(struct player p) {
+    printf("===================\n");
+    printf("  Player info:\n");
+    printf("  fd: %d\n", p.fd);
+    printf("  name: %s\n", p.name);
+    printf("  role: %c\n", p.role);
+    printf("  message frags: %s\n", p.msg_fragment);
+    printf("===================\n");
 }

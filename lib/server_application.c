@@ -91,7 +91,7 @@ trans_code process_new_player(int fd, struct ttt_game new_game) {
         tcode = get_player_response(&in_cmd, &p, new_game);
         if (tcode == TRANS_OK) {
             if (in_cmd.code == PLAY) {
-                add_player(new_game, p, in_cmd.arg1);
+                add_player(&new_game, p, in_cmd.arg1);
                 done = 1;
             } else {
                 // Bad context command received - complain and query again
@@ -121,7 +121,7 @@ trans_code process_move(struct command move_cmd, struct ttt_game* game, struct p
     char space = get_board_val(*game, row, col);
     if (space == '.') {
         // This is a legal move: update the board, check for win conditions, then notify the players
-        set_board_val(*game, row, col, role);
+        set_board_val(game, row, col, role);
         char* win_status = get_win_status(*game);
 
         if (win_status == NULL) {
@@ -170,7 +170,7 @@ trans_code process_draw_req(struct command draw_cmd, struct ttt_game* game, stru
     toggle_player(cur_p, *game);
 
     // forward draw suggestion to other player
-    if (send_command(cur_p->fd, draw_cmd) == SEND_FAILED) {
+    if (send_command(cur_p->fd, new_draw_cmd("S")) == SEND_FAILED) {
         return SEND_FAILED;
     }
 
@@ -204,7 +204,7 @@ trans_code process_draw_req(struct command draw_cmd, struct ttt_game* game, stru
             } else if (strcmp(draw_cmd.arg1, "R") == 0) {
                 // Draw is rejected - punt back to original player
                 toggle_player(cur_p, *game);
-                return send_command(cur_p->fd, draw_cmd);
+                return send_command(cur_p->fd, new_draw_cmd("R"));
             } else {
                 // Complain that a new draw request cannot be made
                 tcode = send_command(cur_p->fd, new_invl_cmd("A draw has already been suggested. Choose 'A' to accept or 'R' to reject"));

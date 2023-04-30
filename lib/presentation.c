@@ -90,13 +90,6 @@ cmd_code str_to_code(char* codestr) {
     return BADV;
 }
 
-void display_cmd(struct command cmd) {
-    printf("Command code: %s\n", code_to_str(cmd.code));
-    printf("   Arg 1: %s\n", cmd.arg1);
-    printf("   Arg 2: %s\n", cmd.arg2);
-    printf("   Arg 3: %s\n", cmd.arg3);
-}
-
 // Returns true if arguments of provided command are valid based on its code value.
 // Validating commands is only intended to be used by the server, and only accepts
 // legal client calls as a result--server commands always return false.
@@ -342,12 +335,14 @@ int send_command_msg(int fd, char* cmdstr, int max_packet_size) {
     return 0;
 }
 
-// Attempts to send command in message format to specified file descriptor. 
+// Attempts to send command in message format to specified file descriptor.
+// A send attempt always frees the command args, making commands single use for this purpose.
 // Returns SEND_FAILED if this fails, TRANS_OK otherwise.
 trans_code send_command(int client_fd, struct command cmd) {
     char* cmdstr = cmd_to_str(cmd);
     int send_code = send_command_msg(client_fd, cmdstr, MAX_DATA_PACKET_SIZE);
     free(cmdstr);
+    free_cmd(cmd);
     return send_code ? SEND_FAILED : TRANS_OK;
 }
 

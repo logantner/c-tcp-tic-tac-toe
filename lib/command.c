@@ -155,6 +155,13 @@ void free_cmd(struct command cmd) {
     }
 }
 
+void display_cmd(struct command cmd) {
+    printf("Command code: %s\n", code_to_str(cmd.code));
+    printf("   Arg 1: %s\n", cmd.arg1);
+    printf("   Arg 2: %s\n", cmd.arg2);
+    printf("   Arg 3: %s\n", cmd.arg3);
+}
+
 // returns a struct command will nulled fields
 struct command new_cmd() {
     struct command cmd;
@@ -172,7 +179,7 @@ struct command new_wait_cmd() {
 struct command new_begn_cmd(char* role) {
     struct command cmd = new_cmd();
     cmd.code = BEGN;
-    cmd.arg1 = role;
+    cmd.arg1 = strdup(role);
     return cmd;
 }
 
@@ -182,38 +189,38 @@ struct command new_movd_cmd(char* role, int x, int y, char* grid) {
 
     struct command cmd = new_cmd();
     cmd.code = MOVD;
-    cmd.arg1 = role;
-    cmd.arg1 = coords;
-    cmd.arg1 = grid;
+    cmd.arg1 = strdup(role);
+    cmd.arg2 = strdup(coords);
+    cmd.arg3 = strdup(grid);
     return cmd;
 }
 
 struct command new_invl_cmd(char* reason) {
     struct command cmd = new_cmd();
     cmd.code = INVL;
-    cmd.arg1 = reason;
+    cmd.arg1 = strdup(reason);
     return cmd;
 }
 
 struct command new_draw_cmd(char* draw_req) {
     struct command cmd = new_cmd();
     cmd.code = DRAW;
-    cmd.arg1 = draw_req;
+    cmd.arg1 = strdup(draw_req);
     return cmd;
 }
 
 struct command new_over_cmd(char* win_type, char* outcome) {
     struct command cmd = new_cmd();
     cmd.code = OVER;
-    cmd.arg1 = win_type;
-    cmd.arg2 = outcome;
+    cmd.arg1 = strdup(win_type);
+    cmd.arg2 = strdup(outcome);
     return cmd;
 }
 
 struct command new_play_cmd(char* name) {
     struct command cmd = new_cmd();
     cmd.code = PLAY;
-    cmd.arg1 = name;
+    cmd.arg1 = strdup(name);
     return cmd;
 }
 
@@ -223,8 +230,8 @@ struct command new_move_cmd(char* role, int x, int y) {
 
     struct command cmd = new_cmd();
     cmd.code = MOVE;
-    cmd.arg1 = role;
-    cmd.arg2 = coords;
+    cmd.arg1 = strdup(role);
+    cmd.arg2 = strdup(coords);
     return cmd;
 }
 

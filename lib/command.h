@@ -30,6 +30,8 @@ char* cmd_to_str(struct command);
 char* code_to_str(cmd_code);
 cmd_code get_code(char*);
 
+void display_cmd(struct command);
+
 // command-building functions
 struct command new_cmd();
 // server commands

@@ -22,7 +22,6 @@ char* trans_code_to_str(trans_code);
 
 // other command/code functions
 int get_cmd_len(char*, int);
-void display_cmd(struct command);
 int is_valid_cmd(struct command, char*);
 
 #endif
