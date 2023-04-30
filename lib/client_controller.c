@@ -146,8 +146,11 @@ void play_game(int server_fd) {
 }
 
 trans_code get_server_cmd(int fd, struct command* in_cmd, char* msg_fragment) {
-    trans_code tcode = read_command(fd, in_cmd, msg_fragment, NULL);
+    char errmsg[300];
+    trans_code tcode = read_command(fd, in_cmd, msg_fragment, errmsg);
     if (tcode != TRANS_OK) {
+        printf("Received the following trans_code: %s\n", trans_code_to_str(tcode));
+        printf("Error message: %s\n", errmsg);
         printf("Unfortunately, there was a connection issue. Quitting now...\n");
     }
     else {
