@@ -54,10 +54,11 @@ int run_server() {
         if (num_players(game) == 2) {
             printf("Players at ports %d and %d have been matched to a game.\n", game.p1.fd, game.p2.fd);
             tcode = moderate_game(game);
+            printf("Game has conclude. Performing post-game cleanup\n");
             post_game_cleanup(game);
+            game = new_game();
+            printf("Cleanup complete. Free to wait for new players to join\n");
         }
-
-        
 
         /////////////////////
         /////////////////////

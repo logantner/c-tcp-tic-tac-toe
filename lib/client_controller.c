@@ -9,11 +9,14 @@
 #include "client_controller.h"
 #include "command.h"
 #include "config.h"
+#include "game.h"
 #include "presentation.h"
 
 
 int connect_client();
 trans_code get_server_cmd(int, struct command*, char*);
+trans_code take_turn(int, char*, char*, int*);
+trans_code move_sequence(int, char*, char*, int*);
 
 
 int run_client() {
@@ -114,9 +117,11 @@ int connect_client() {
 
 void play_game(int server_fd) {
     char name[100];
+    char role[5];
     trans_code tcode;
     struct command in_cmd;
     char msg_fragment[MAX_DATA_PACKET_SIZE];
+    int game_over = 0;
 
     printf("What is your name: ");
     fgets(name, 100, stdin);
@@ -141,8 +146,118 @@ void play_game(int server_fd) {
     if (get_server_cmd(server_fd, &in_cmd, msg_fragment) != TRANS_OK) {
         return;
     }
+
+    if (strcmp(in_cmd.arg1, "X") == 0) {
+        printf("You are player X, and it's your turn now\n");
+        strcpy(role, "X");
+        tcode = take_turn(server_fd, role, msg_fragment, &game_over);
+        if (tcode == SEND_FAILED) {
+            printf("Send failure: quitting\n");
+            free_cmd(in_cmd);
+            return;
+        }
+    } else if (strcmp(in_cmd.arg1, "O") == 0) {
+        printf("You are player O. Waiting for your turn...\n");
+        strcpy(role, "O");
+    } else {
+        printf("I'm not sure what role '%s' is supposed to be...\n", in_cmd.arg1);
+    }
+
     free_cmd(in_cmd);
+
+    // START THE GAME LOOP
+    while (!game_over) {
+        // Get server response
+        if (get_server_cmd(server_fd, &in_cmd, msg_fragment) != TRANS_OK) {
+            free_cmd(in_cmd);
+            return;
+        }
+
+        if (in_cmd.code == MOVD) {
+            display_board(in_cmd.arg3);
+        }
+
+        if (in_cmd.code == OVER) {
+            game_over = 1;
+        }
+
+        free_cmd(in_cmd);
+
+        if (!game_over && take_turn(server_fd, role, msg_fragment, &game_over) != TRANS_OK) {
+            break;
+        }
+    }
     
+}
+
+
+
+trans_code take_turn(int fd, char* role, char* frag, int* game_over) {
+    char resp[100];
+    trans_code tcode;
+    struct command in_cmd;
+
+    printf("Would you like to MOVE, DRAW or RSGN? ");
+    fgets(resp, 100, stdin);
+    resp[strcspn(resp, "\n")] = 0;
+    if (strcmp(resp, "MOVE") == 0) {
+        tcode = move_sequence(fd, role, frag, game_over);
+    } else if (strcmp(resp, "DRAW") == 0) {
+        printf("And what type of draw request would you like? ");
+        memset(resp, 0, strlen(resp));
+        fgets(resp, 100, stdin);
+        resp[strcspn(resp, "\n")] = 0;
+        printf("Ok, requesting a draw from the opponent. Sit tight...\n");
+        tcode = send_command(fd, new_draw_cmd(resp));
+    } else if (strcmp(resp, "RSGN") == 0) {
+        printf("Ok, just letting your opponent know that you are a bitch...\n");
+        tcode = send_command(fd, new_rsgn_cmd());
+    } else if (strcmp(resp, "WAIT") == 0) {
+        printf("Ok, sending an invalid message to server\n");
+        tcode = send_command(fd, new_wait_cmd());
+    } else {
+        printf("Invalid response.\n");
+        tcode = take_turn(fd, role, frag, game_over);
+    }
+    return tcode;
+}
+
+trans_code move_sequence(int fd, char* role, char* frag, int* game_over) {
+    char resp[100];
+    trans_code tcode;
+    struct command in_cmd;
+
+    printf("Which ('R,C') space would you like to choose? ");
+    fgets(resp, 100, stdin);
+    resp[strcspn(resp, "\n")] = 0;
+    printf("Ok, requesting server to move %s to space (%s)...", role, resp);
+
+    tcode = send_command(fd, new_move_cmd(role, resp[0]-'0', resp[2]-'0'));
+
+    if (tcode != TRANS_OK) {
+        printf("Send failure\n");
+        return tcode;
+    }
+
+    tcode = get_server_cmd(fd, &in_cmd, frag);
+    if (tcode != TRANS_OK) {
+        printf("Read failure\n");
+        free_cmd(in_cmd);
+        return tcode;
+    }
+
+    if (in_cmd.code == INVL) {
+        printf("This is an illegal move. Try again\n");
+        free_cmd(in_cmd);
+        move_sequence(fd, role, frag, game_over);
+    } else {
+        if (in_cmd.code == MOVD) {
+            printf("Your move was accepted. Waiting for your opponent to move...\n");
+        }
+        free_cmd(in_cmd);
+    }
+
+    return TRANS_OK;
 }
 
 trans_code get_server_cmd(int fd, struct command* in_cmd, char* msg_fragment) {

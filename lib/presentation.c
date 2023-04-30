@@ -55,28 +55,16 @@ int get_cmd_len(char* msg, int msg_len) {
 }
 
 cmd_code get_code(char* msg) {
-    printf("Attempting to fetch code for buffer '%s'...\n", msg);
     if (strlen(msg) < 4 || msg[4] != '|') {
-        if (strlen(msg) < 4 ) {
-            printf("The buffer is too short\n");
-        } else if (msg[4] != '|') {
-            printf("First msg char is empty char? %d\n", msg[0] == '\x02');
-            printf("0) '%c' --> %d\n", msg[0], msg[0]);
-            printf("1) '%c' --> %d\n", msg[1], msg[1]);
-            printf("2) '%c' --> %d\n", msg[2], msg[2]);
-            printf("3) '%c' --> %d\n", msg[3], msg[3]);
-            printf("4) '%c' --> %d\n", msg[4], msg[4]);
-            printf("The buffer does not have correct bar placement: Expected '|' but got '%c'\n", msg[4]);
+        if (msg[4] != '|') {
+            fprintf(stderr, "Message '%s' has bad bar placement\n", msg);
         }
-        
         return BADV;
     }
 
     char code[5];
     memcpy(code, msg, 4);
     code[4] = 0;
-
-    printf("Fetched code string '%s'\n", code);
 
     return str_to_code(code);
 }

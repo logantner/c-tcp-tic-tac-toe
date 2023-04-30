@@ -214,7 +214,8 @@ trans_code process_draw_req(struct command draw_cmd, struct ttt_game* game, stru
             } else if (strcmp(draw_cmd.arg1, "R") == 0) {
                 // Draw is rejected - punt back to original player
                 toggle_player(cur_p, *game);
-                return send_command(cur_p->fd, new_draw_cmd("R"));
+                tcode = send_command(cur_p->fd, new_draw_cmd("R"));
+                return tcode;
             } else {
                 // Complain that a new draw request cannot be made
                 tcode = send_command(cur_p->fd, new_invl_cmd("A draw has already been suggested. Choose 'A' to accept or 'R' to reject"));
