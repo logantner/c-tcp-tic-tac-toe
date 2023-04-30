@@ -11,16 +11,16 @@
 #include "presentation.h"
 #include "server_application.h"
 
-int create_listening_socket();
+int create_listening_socket(char*);
 int extract_port(const struct addrinfo* const);
 void display_addrinfo(struct addrinfo*);
 void talk_to_client(int);
 
 
-int run_server() {
+int run_server(char* ip_address, char* port) {
     printf("Starting local server:\n");
 
-    int conn_sockfd = create_listening_socket();
+    int conn_sockfd = create_listening_socket(port);
 
     if (conn_sockfd < 0) {
        printf("Failed to set up server listener. Check stderr for more info\n");
@@ -68,7 +68,7 @@ int run_server() {
     return 0;
 }
 
-int create_listening_socket() {
+int create_listening_socket(char* port) {
     struct addrinfo hint, *info_list;
 
     memset(&hint, 0, sizeof(struct addrinfo));
@@ -76,7 +76,7 @@ int create_listening_socket() {
     hint.ai_socktype = SOCK_STREAM;
     hint.ai_flags    = AI_PASSIVE;
 
-    int error = getaddrinfo(NULL, SERVER_PORT, &hint, &info_list);
+    int error = getaddrinfo(NULL, port, &hint, &info_list);
     if (error) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(error));
         return -1;
