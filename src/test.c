@@ -5,10 +5,10 @@
 #include "../lib/test/name_set_tests.h"
 
 int main(int argc, char** argv) {
-    // run_all_presentation_tests();
-    // run_all_common_tests();
-    // run_all_command_tests();
-    // run_all_game_tests();
+    run_all_presentation_tests();
+    run_all_common_tests();
+    run_all_command_tests();
+    run_all_game_tests();
     run_all_name_set_tests();
 
     return 0;

@@ -12,9 +12,7 @@
 #include "config.h"
 
 
-
 trans_code get_player_response(struct command*, struct player*, struct ttt_game*);
-void end_game(struct ttt_game, int);
 void toggle_player(struct player*, struct ttt_game);
 
 trans_code process_resignation(struct command, struct ttt_game*, struct player);
@@ -22,6 +20,7 @@ trans_code process_move(struct command, struct ttt_game*, struct player*);
 trans_code process_draw_req(struct command, struct ttt_game*, struct player*);
 trans_code process_bad_context(struct command, struct player);
 void handle_trans_failure(int, struct ttt_game, struct player);
+
 
 // Asynchronously collect, validate player names from players
 // Send BEGN to both players, set P1 as current player
@@ -77,49 +76,6 @@ trans_code moderate_game(struct ttt_game game) {
         }
 
         free_cmd(in_cmd);
-    }
-
-    return tcode;
-}
-
-// Given the fd to a current connection, attempts to query client for name.
-// If successful, client/name is assigned to an unassigned player of game.
-// Otherwise, a bad trans_code is returned and no player is assigned.
-trans_code process_new_player(int fd, struct ttt_game* game) {
-    struct player p = new_player();
-    p.fd = fd;
-
-    trans_code tcode;
-    struct command in_cmd;
-    int done = 0;
-
-    while (!done) {
-        tcode = get_player_response(&in_cmd, &p, game);
-        if (tcode == TRANS_OK) {
-            if (in_cmd.code == PLAY) {
-                add_player(game, p, in_cmd.arg1);
-                printf("Paired a client to an open game!\n");
-                done = 1;
-            } else {
-                // Bad context command received - complain and query again
-                tcode = process_bad_context(in_cmd, p);
-            }
-        }
-
-        if (tcode != TRANS_OK && tcode != READ_OK_INVL_CMD) {
-            // trans error has occured; abort
-            done = 1;
-        }
-
-        free_cmd(in_cmd);
-    }
-
-    // Tell successfully added player to wait until game is set up
-    tcode = send_command(fd, new_wait_cmd());
-    if (tcode == SEND_FAILED) {
-        // TODO: add a remove player function and invoke it here
-    } else {
-        printf("Sent WAIT to player\n");
     }
 
     return tcode;

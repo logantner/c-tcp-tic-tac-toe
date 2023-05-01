@@ -51,8 +51,7 @@ int run_server(char* ip_address, char* port) {
        return 1;
     }
 
-    // install_handlers();
-
+    install_handlers();
     
     struct sockaddr_storage client_addr;
     socklen_t client_addr_size;
@@ -90,37 +89,13 @@ int run_server(char* ip_address, char* port) {
 
             standby_clientfd = 0;
         }
-
-        /////////////////////
-        // Modularize this //
-        /////////////////////
-
-        // tcode = process_new_player(client_sockfd, &game);
-        // if (tcode != TRANS_OK) {
-        //     printf("There were problems with the client at socket %d. Disconnecting...", client_sockfd);
-        //     close(client_sockfd);
-        // }
-
-        // printf("The current game has %d players\n", num_players(game));
-
-        // if (num_players(game) == 2) {
-        //     printf("Players at ports %d and %d have been matched to a game.\n", game.p1.fd, game.p2.fd);
-        //     tcode = moderate_game(game);
-        //     printf("Game has conclude. Performing post-game cleanup\n");
-        //     post_game_cleanup(game);
-        //     game = new_game();
-        //     printf("Cleanup complete. Free to wait for new players to join\n");
-        // }
-
-        /////////////////////
-        /////////////////////
-        /////////////////////
     }
 
     printf("Shutting down server...");
     if (conn_sockfd > 0) {
         close(conn_sockfd);
     }
+    free_name_set(name_set);
 
     return 0;
 }
@@ -161,9 +136,7 @@ void* execute_game_worker(void* _args) {
 
     moderate_game(game);
 
-    // clients->ret_tcode = moderate_game(game);
     post_game_cleanup(game, &name_set);
-
     return NULL;
 }
 

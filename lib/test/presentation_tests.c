@@ -95,6 +95,17 @@ void run_send_command_tests() {
 }
 
 void test_send_command(int fd, struct command cmd) {
+    // Make sure args are on heap!
+    if (cmd.arg1 != NULL) {
+        cmd.arg1 = strdup(cmd.arg1);
+    }
+    if (cmd.arg2 != NULL) {
+        cmd.arg2 = strdup(cmd.arg2);
+    }
+    if (cmd.arg3 != NULL) {
+        cmd.arg3 = strdup(cmd.arg3);
+    }
+
     trans_code tcode = send_command(fd, cmd);
     if (fd == STDOUT_FILENO) { printf("\n"); }
     if (tcode != TRANS_OK) {
