@@ -158,7 +158,7 @@ void new_begn_cmd_test() {
 
 void new_movd_cmd_test() {
     printf("=============== NEW_MOVD_CMD TEST ===============\n");
-    struct ttt_game game = new_game();
+    struct ttt_game game = new_game(10,11);
     set_board_val(&game, 1, 1, 'X');
     struct command cmd = new_movd_cmd("X", 1, 1, game.board);
     display_cmd(cmd);
