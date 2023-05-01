@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
+#include <signal.h>
+
 #include "config.h"
 #include "game.h"
 #include "presentation.h"
@@ -16,16 +18,21 @@ int extract_port(const struct addrinfo* const);
 void display_addrinfo(struct addrinfo*);
 void talk_to_client(int);
 
+void stop_server(int);
+void install_handlers();
+int is_active_server = 1;
+
 
 int run_server(char* ip_address, char* port) {
-    printf("Starting local server:\n");
+    printf("Starting server:\n");
 
     int conn_sockfd = create_listening_socket(port);
-
     if (conn_sockfd < 0) {
        printf("Failed to set up server listener. Check stderr for more info\n");
        return 1;
     }
+
+    // install_handlers();
 
     // Listen and accept new connections
     struct sockaddr_storage client_addr;
@@ -34,9 +41,16 @@ int run_server(char* ip_address, char* port) {
 
     struct ttt_game game = new_game();
     trans_code tcode;
-    while(1) {
+
+    while(is_active_server) {
+
         client_addr_size = sizeof(client_addr);
         client_sockfd = accept(conn_sockfd, (struct sockaddr *)&client_addr, &client_addr_size);
+        if (client_sockfd < 0) {
+            perror("accept");
+            continue;
+        }
+
         printf("Received client with fd value %d\n", client_sockfd);
 
         /////////////////////
@@ -65,7 +79,26 @@ int run_server(char* ip_address, char* port) {
         /////////////////////
     }
 
+    printf("Shutting down server...");
+    if (conn_sockfd > 0) {
+        close(conn_sockfd);
+    }
+
     return 0;
+}
+
+void stop_server(int signum) {
+    is_active_server = 0;
+}
+
+void install_handlers() {
+    struct sigaction act;
+    act.sa_handler = stop_server;
+    act.sa_flags = 0;
+    sigemptyset(&act.sa_mask);
+
+    sigaction(SIGINT, &act, NULL);
+    sigaction(SIGTERM, &act, NULL);
 }
 
 int create_listening_socket(char* port) {
@@ -171,35 +204,4 @@ int extract_port(const struct addrinfo* const addr) {
         port = -1;
     }
     return port;
-}
-
-void talk_to_client(int client_sockfd) {
-    // char readbuf[MAX_DATA_PACKET_SIZE];
-    // char writebuf[MAX_DATA_PACKET_SIZE];
-    // int bytes_returned;
-    // int bytes_sent;
-
-    // strcpy(writebuf, "Greetings from the server side!");
-    // bytes_sent = send(client_sockfd, writebuf, strlen(writebuf), 0);
-
-    // while(1) {
-    //     bytes_returned = recv(client_sockfd, readbuf, MAX_DATA_PACKET_SIZE, 0);
-    //     if (bytes_returned > 0) {
-    //         printf("Received message of length %d from client: '%s'\n", bytes_returned, readbuf);
-    //     } else if (bytes_returned == 0) {
-    //         printf("Client his ended communication\n");
-    //         break;
-    //     } else {
-    //         printf("Connection to client was lost\n");
-    //         break;
-    //     }
-
-    //     strcpy(writebuf, "Message received!");
-    //     bytes_sent = send(client_sockfd, writebuf, strlen(writebuf), 0);
-
-    //     // Clean out the buffers
-    //     memset(writebuf, 0, strlen(writebuf));
-    //     memset(readbuf, 0, strlen(readbuf));
-    // }
-    // close(client_sockfd);
 }
