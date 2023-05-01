@@ -2,12 +2,15 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 #include "game.h"
+#include "name_set_tools.h"
 #include "presentation.h"
 #include "server_application.h"
 #include "command.h"
 #include "config.h"
+
 
 
 trans_code get_player_response(struct command*, struct player*, struct ttt_game*);
@@ -123,21 +126,36 @@ trans_code process_new_player(int fd, struct ttt_game* game) {
 }
 
 // Queries player connected to pfd for their name repeatedly until an acceptable answer is received.
+// Specifically, names will not be accepted unless they are distinct within the active name_set archive.
 // Name is bound to the appropriate player within the ttt_game.
-trans_code query_player_info(struct player* p, struct ttt_game* game) {
+trans_code query_player_info(struct player* p, struct ttt_game* game, struct name_set* name_set) {
     trans_code tcode;
     struct command in_cmd;
     int done = 0;
+    int add_name_code;
 
     while (!done) {
         tcode = get_player_response(&in_cmd, p, game);
         printf("Got player response with tcode %d\n", tcode);
         if (tcode == TRANS_OK) {
             if (in_cmd.code == PLAY) {
-                // TODO: check if the name, cmd.arg1, is unique to player list
-                p->name = strdup(in_cmd.arg1);
-                printf("Registered '%s' to the game roster\n", in_cmd.arg1);
-                done = 1;
+
+                // Lock the thread and attempt to update the name_set with the new name
+                pthread_mutex_lock(&name_set_mutex);
+                add_name_code = add_name(name_set, in_cmd.arg1);
+                pthread_mutex_unlock(&name_set_mutex);
+
+                if (add_name_code == 0) {
+                    // Name was successfully registered - proceed
+                    p->name = strdup(in_cmd.arg1);
+                    printf("Registered '%s' to the game roster. Current roster:\n", in_cmd.arg1);
+                    display_name_set(*name_set);
+                    done = 1;
+                } else {
+                    // Name is not unique - query for another
+                    tcode = send_command(p->fd, new_invl_cmd("Sorry, that name is already taken. Please provide another name"));
+                }
+                
             } else {
                 // Bad context command received - complain and query again
                 tcode = process_bad_context(in_cmd, *p);
@@ -300,7 +318,14 @@ void handle_trans_failure(int tcode, struct ttt_game game, struct player cur_p) 
     }
 }
 
-void post_game_cleanup(struct ttt_game game) {
+void post_game_cleanup(struct ttt_game game, struct name_set* name_set) {
+    printf("A game has completed, cleaning up...\n");
+
+    rem_name(name_set, game.p1.name);
+    rem_name(name_set, game.p2.name);
+    printf("Removed players from registry. Current registry:\n");
+    display_name_set(*name_set);
+
     free_player(game.p1);
     free_player(game.p2);
     close(game.p1.fd);

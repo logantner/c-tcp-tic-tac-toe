@@ -12,17 +12,22 @@
 #include "game.h"
 #include "presentation.h"
 #include "server_application.h"
+#include "name_set_tools.h"
 
 int create_listening_socket(char*);
 int extract_port(const struct addrinfo* const);
 void display_addrinfo(struct addrinfo*);
 void talk_to_client(int);
 
-void* execute_game(void*);
+// Thread worker functions
+void* execute_game_worker(void*);
 void* query_player_worker(void*);
 
+// Signal functions
 void stop_server(int);
 void install_handlers();
+
+struct name_set name_set;
 int is_active_server = 1;
 
 struct clients {
@@ -48,16 +53,17 @@ int run_server(char* ip_address, char* port) {
 
     // install_handlers();
 
-    // Listen and accept new connections
+    
     struct sockaddr_storage client_addr;
     socklen_t client_addr_size;
     int client_sockfd;
     
     int standby_clientfd = 0;
     trans_code tcode;
+    name_set = new_name_set();
 
     while(is_active_server) {
-
+        // Listen for and accept new connections
         client_addr_size = sizeof(client_addr);
         client_sockfd = accept(conn_sockfd, (struct sockaddr *)&client_addr, &client_addr_size);
         if (client_sockfd < 0) {
@@ -78,7 +84,7 @@ int run_server(char* ip_address, char* port) {
             
             printf("Clients at sockets %d and %d have been paired to a game\n", clients->fd1, clients->fd2);
 
-            if (pthread_create(&thid, NULL, execute_game, clients)) {
+            if (pthread_create(&thid, NULL, execute_game_worker, clients)) {
                 perror("pthread_create()");
             }
 
@@ -88,10 +94,6 @@ int run_server(char* ip_address, char* port) {
         /////////////////////
         // Modularize this //
         /////////////////////
-
-        // Create data bundle with player, returned tcode
-        // Run worker to process new player with data
-        // Once worker is complete, extract player data into an available game
 
         // tcode = process_new_player(client_sockfd, &game);
         // if (tcode != TRANS_OK) {
@@ -123,8 +125,7 @@ int run_server(char* ip_address, char* port) {
     return 0;
 }
 
-
-void* execute_game(void* _args) {
+void* execute_game_worker(void* _args) {
     // Extract info from _args
     struct clients clients = *((struct clients*)_args);
     int cfd1 = clients.fd1;
@@ -161,7 +162,7 @@ void* execute_game(void* _args) {
     moderate_game(game);
 
     // clients->ret_tcode = moderate_game(game);
-    // post_game_cleanup(game);
+    post_game_cleanup(game, &name_set);
 
     return NULL;
 }
@@ -177,7 +178,7 @@ void* query_player_worker(void* _args) {
         p = &(args->game->p2);
     }
 
-    args->ret_tcode = query_player_info(p, args->game);
+    args->ret_tcode = query_player_info(p, args->game, &name_set);
     return 0;
 }
 

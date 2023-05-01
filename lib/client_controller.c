@@ -99,10 +99,34 @@ void play_game(int server_fd) {
         return;
     }
 
-    // Get the WAIT command from the server
+    
+
+    // Get the response from the server
     if (get_server_cmd(server_fd, &in_cmd, msg_fragment) != TRANS_OK) {
         return;
     }
+
+    while (in_cmd.code != WAIT) {
+        // If you didn't get a WAIT back, your name is taken. Keep querying until it works.
+        printf("Sorry, that name was already taken, let's try another: ");
+        memset(name, 0, strlen(name));
+        fgets(name, 100, stdin);
+        name[strcspn(name, "\n")] = 0;
+
+        printf("Thanks, %s! Requesting the server to pair you to a game.\n", name);
+        tcode = send_command(server_fd, new_play_cmd(name));
+        printf("Sent your name to the server, let's see what happens...\n");
+        
+        if (tcode != TRANS_OK) {
+            printf("Unfortunately, there was a connection issue. Quitting now...\n");
+            return;
+        }
+
+        if (get_server_cmd(server_fd, &in_cmd, msg_fragment) != TRANS_OK) {
+            return;
+        }
+    }
+
     free_cmd(in_cmd);
 
     // Get the BEGN command from the server

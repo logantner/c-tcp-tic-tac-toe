@@ -1,6 +1,10 @@
 #ifndef NAME_SET_TOOLS_H
 #define NAME_SET_TOOLS_H
 
+#include <pthread.h>
+
+extern pthread_mutex_t name_set_mutex;
+
 struct name_set {
     char** names;
     int set_size;

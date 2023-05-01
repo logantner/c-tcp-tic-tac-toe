@@ -5,6 +5,7 @@
 #include "name_set_tools.h"
 
 const int INIT_SET_SIZE = 5;
+pthread_mutex_t name_set_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 struct name_set new_name_set() {
     struct name_set ns;
