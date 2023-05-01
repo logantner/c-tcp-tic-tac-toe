@@ -15,7 +15,7 @@ void run_all_game_tests() {
 
 void test_new_game() {
     printf("=========== Running new_game test ===========\n");
-    struct ttt_game game = new_game();
+    struct ttt_game game = new_game(10,11);
     printf("Active status: %d\n", game.is_active);
     display_player(game.p1);
     display_player(game.p2);
@@ -24,7 +24,7 @@ void test_new_game() {
 
 void test_board_spaces() {
     printf("=========== Running board space tests ===========\n");
-    struct ttt_game game = new_game();
+    struct ttt_game game = new_game(10, 11);
     set_board_val(&game, 1, 1, 'X');
     set_board_val(&game, 2, 2, 'O');
     set_board_val(&game, 3, 2, 'X');
@@ -59,7 +59,7 @@ void run_get_win_status_tests() {
 }
 
 void test_get_win_status(char* board) {
-    struct ttt_game game = new_game();
+    struct ttt_game game = new_game(10, 11);
     strcpy(game.board, board);
     display_board(game.board);
     char* win_status = get_win_status(game) == NULL ? "none" : get_win_status(game);
@@ -67,31 +67,31 @@ void test_get_win_status(char* board) {
 }
 
 void test_adding_players() {
-    struct ttt_game game = new_game();
-    printf("New game has %d players to start\n", num_players(game));
+    // struct ttt_game game = new_game();
+    // printf("New game has %d players to start\n", num_players(game));
 
-    struct player p_a = new_player();
-    p_a.fd = 11;
-    char* name_a = strdup("Name A");
-    add_player(&game, p_a, name_a);
+    // struct player p_a = new_player();
+    // p_a.fd = 11;
+    // char* name_a = strdup("Name A");
+    // add_player(&game, p_a, name_a);
 
-    printf("** Added player A **\n");
-    printf("Game now has %d players:\n", num_players(game));
-    display_player(game.p1);
-    display_player(game.p2);
+    // printf("** Added player A **\n");
+    // printf("Game now has %d players:\n", num_players(game));
+    // display_player(game.p1);
+    // display_player(game.p2);
 
-    struct player p_b = new_player();
-    p_b.fd = 12;
-    char* name_b = strdup("Name B");
-    add_player(&game, p_b, name_b);
+    // struct player p_b = new_player();
+    // p_b.fd = 12;
+    // char* name_b = strdup("Name B");
+    // add_player(&game, p_b, name_b);
 
-    printf("** Added player B **\n");
-    printf("Game now has %d players:\n", num_players(game));
-    display_player(game.p1);
-    display_player(game.p2);
+    // printf("** Added player B **\n");
+    // printf("Game now has %d players:\n", num_players(game));
+    // display_player(game.p1);
+    // display_player(game.p2);
 
-    printf("** Freeing players **\n");
-    free_player(game.p1);
-    free_player(game.p2);
+    // printf("** Freeing players **\n");
+    // free_player(game.p1);
+    // free_player(game.p2);
 }
 

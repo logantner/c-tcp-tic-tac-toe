@@ -10,7 +10,7 @@
 #include "config.h"
 
 
-trans_code get_player_response(struct command*, struct player*, struct ttt_game);
+trans_code get_player_response(struct command*, struct player*, struct ttt_game*);
 void end_game(struct ttt_game, int);
 void toggle_player(struct player*, struct ttt_game);
 
@@ -20,7 +20,8 @@ trans_code process_draw_req(struct command, struct ttt_game*, struct player*);
 trans_code process_bad_context(struct command, struct player);
 void handle_trans_failure(int, struct ttt_game, struct player);
 
-// Send BEGN to both players
+// Asynchronously collect, validate player names from players
+// Send BEGN to both players, set P1 as current player
 // Wait to receive response from current player: <----------------------------------------------+
 // - MOVE                                                                                       |
 //    - If move is illegal, send INVL and wait for another response --------------------------->|
@@ -37,6 +38,7 @@ void handle_trans_failure(int, struct ttt_game, struct player);
 // - Any other command                                                                          |                                  
 //    - send INVL and continue ---------------------------------------------------------------->|
 trans_code moderate_game(struct ttt_game game) {
+
     trans_code tcode = TRANS_OK;
     struct command in_cmd;
     struct player cur_p = game.p1;  // p1 always goes first
@@ -51,7 +53,7 @@ trans_code moderate_game(struct ttt_game game) {
     }
 
     while (game.is_active) {
-        tcode = get_player_response(&in_cmd, &cur_p, game);
+        tcode = get_player_response(&in_cmd, &cur_p, &game);
         
         if (tcode == TRANS_OK) {
             // The transmission succeeded - process the command
@@ -87,8 +89,9 @@ trans_code process_new_player(int fd, struct ttt_game* game) {
     trans_code tcode;
     struct command in_cmd;
     int done = 0;
+
     while (!done) {
-        tcode = get_player_response(&in_cmd, &p, *game);
+        tcode = get_player_response(&in_cmd, &p, game);
         if (tcode == TRANS_OK) {
             if (in_cmd.code == PLAY) {
                 add_player(game, p, in_cmd.arg1);
@@ -112,6 +115,47 @@ trans_code process_new_player(int fd, struct ttt_game* game) {
     tcode = send_command(fd, new_wait_cmd());
     if (tcode == SEND_FAILED) {
         // TODO: add a remove player function and invoke it here
+    } else {
+        printf("Sent WAIT to player\n");
+    }
+
+    return tcode;
+}
+
+// Queries player connected to pfd for their name repeatedly until an acceptable answer is received.
+// Name is bound to the appropriate player within the ttt_game.
+trans_code query_player_info(struct player* p, struct ttt_game* game) {
+    trans_code tcode;
+    struct command in_cmd;
+    int done = 0;
+
+    while (!done) {
+        tcode = get_player_response(&in_cmd, p, game);
+        printf("Got player response with tcode %d\n", tcode);
+        if (tcode == TRANS_OK) {
+            if (in_cmd.code == PLAY) {
+                // TODO: check if the name, cmd.arg1, is unique to player list
+                p->name = strdup(in_cmd.arg1);
+                printf("Registered '%s' to the game roster\n", in_cmd.arg1);
+                done = 1;
+            } else {
+                // Bad context command received - complain and query again
+                tcode = process_bad_context(in_cmd, *p);
+            }
+        }
+
+        if (tcode != TRANS_OK && tcode != READ_OK_INVL_CMD) {
+            // trans error has occured; abort
+            done = 1;
+        }
+
+        free_cmd(in_cmd);
+    }
+
+    // Tell successfully added player to wait until game is set up
+    tcode = send_command(p->fd, new_wait_cmd());
+    if (tcode == SEND_FAILED) {
+        fprintf(stderr, "Send failure while sending WAIT command");
     } else {
         printf("Sent WAIT to player\n");
     }
@@ -188,7 +232,7 @@ trans_code process_draw_req(struct command draw_cmd, struct ttt_game* game, stru
     int tcode;
     while (1) {
         free_cmd(draw_cmd);
-        tcode = get_player_response(&draw_cmd, cur_p, *game);
+        tcode = get_player_response(&draw_cmd, cur_p, game);
 
         if (tcode == READ_OK_INVL_CMD) {
             // handled by get_player_response() already - proceed to query player for new response
@@ -277,7 +321,8 @@ void toggle_player(struct player* p, struct ttt_game game) {
 // read fragments. The contents of in_cmd should be freed using free_cmd to avoid any memory leaks.
 //
 // Any READ_INVL_MSG or READ_OK_INVL_CMD issues are handled immediately here
-trans_code get_player_response(struct command* in_cmd, struct player* p, struct ttt_game game) {
+trans_code get_player_response(struct command* in_cmd, struct player* p, struct ttt_game* game) {
+    printf("Waiting for response from player at fd %d\n", p->fd);
     memset(in_cmd, 0, sizeof(struct command));
     char* err_msg = malloc(300 * sizeof(char));
     trans_code tcode = read_command(p->fd, in_cmd, p->msg_fragment, err_msg);
@@ -289,8 +334,8 @@ trans_code get_player_response(struct command* in_cmd, struct player* p, struct 
         send_command(p->fd, new_invl_cmd(invl_msg));
 
         // Only do this if a game has actually been started (not if we are querying a new player for their name)
-        if (game.is_active) {
-            toggle_player(p, game);
+        if (game != NULL && game->is_active) {
+            toggle_player(p, *game);
             send_command(p->fd, new_over_cmd("D", "Your opponent had a connection issue. Let's call this one a draw."));
         }
     }

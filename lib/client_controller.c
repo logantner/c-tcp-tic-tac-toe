@@ -27,47 +27,10 @@ int run_client() {
         printf("Failed to connect client to server. Check stderr log for more info\n");
         return 1;
     } else {
-        printf("Client is now connected to the server!\n");
+        printf("Client is now connected to the server at fd %d!\n", server_sockfd);
     }
 
     play_game(server_sockfd);
-
-    // char readbuf[MAX_DATA_PACKET_SIZE];
-    // char* writebuf = malloc((MAX_DATA_PACKET_SIZE + 1) * sizeof(char));
-    // size_t max_user_len = MAX_DATA_PACKET_SIZE;
-    // ssize_t resp_len;
-    // int bytes_returned;
-    // int bytes_sent;
-
-    // while (1) {
-    //     bytes_returned = recv(server_sockfd, readbuf, MAX_DATA_PACKET_SIZE, 0);
-    //     if (bytes_returned > 0) {
-    //         printf("Message of length %d from server: '%s'\n", bytes_returned, readbuf);
-    //     } else if (bytes_returned == 0) {
-    //         printf("Server his ended communication\n");
-    //         break;
-    //     } else {
-    //         printf("Connection to serve was lost\n");
-    //         break;
-    //     }
-
-    //     printf("What would you like to send to the server? ");
-    //     resp_len = getline(&writebuf, &max_user_len, stdin);
-    //     writebuf[strcspn(writebuf, "\n")] = 0;
-    //     if (resp_len == 0 || strcmp(writebuf, "quit") == 0) {
-    //         printf("Goodbye!\n");
-    //         break;
-    //     }
-    //     bytes_sent = send(server_sockfd, writebuf, strlen(writebuf), 0);
-
-    //     // Clean out the buffers
-    //     memset(writebuf, 0, strlen(writebuf));
-    //     memset(readbuf, 0, strlen(readbuf));
-    // }
-
-    // free(writebuf);
-    // close(server_sockfd);
-    // return 0;
 
     return 0;
 }

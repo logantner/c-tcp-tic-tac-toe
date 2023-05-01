@@ -9,7 +9,7 @@ char check_win_condition(struct ttt_game, int, int, int);
 int is_board_full(struct ttt_game);
 
 
-struct ttt_game new_game() {
+struct ttt_game new_game(int fd1, int fd2) {
     struct ttt_game game;
 
     strcpy(game.board, ".........");
@@ -19,6 +19,15 @@ struct ttt_game new_game() {
 
     game.p1.role = 'X';
     game.p2.role = 'O';
+
+    // Randomly determine who will go first
+    if (rand() % 2 == 0) {
+        game.p1.fd = fd1;
+        game.p2.fd = fd2;
+    } else {
+        game.p1.fd = fd2;
+        game.p2.fd = fd1;
+    }
 
     return game;
 }

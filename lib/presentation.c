@@ -288,6 +288,8 @@ trans_code read_command(int fd, struct command* cmd, char* leftovers, char* errm
         free(tempbuf);
     }
 
+    printf("%d ===> %s\n", fd, cmdstr);
+
     if( str_to_cmd(cmdstr, strlen(cmdstr), cmd, errmsg) ) {
         // String was read but cannot be parsed as a command.
         fprintf(stderr, "The following message could not be parsed as a command: '%s'\n", cmdstr);
@@ -357,6 +359,7 @@ int send_command_msg(int fd, char* cmdstr, int max_packet_size) {
 // Returns SEND_FAILED if this fails, TRANS_OK otherwise.
 trans_code send_command(int client_fd, struct command cmd) {
     char* cmdstr = cmd_to_str(cmd);
+    printf("%d <=== %s\n", client_fd, cmdstr);
     int send_code = send_command_msg(client_fd, cmdstr, MAX_DATA_PACKET_SIZE);
     free(cmdstr);
     free_cmd(cmd);

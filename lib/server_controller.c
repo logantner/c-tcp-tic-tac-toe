@@ -5,8 +5,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-
 #include <signal.h>
+#include <pthread.h>
 
 #include "config.h"
 #include "game.h"
@@ -18,9 +18,23 @@ int extract_port(const struct addrinfo* const);
 void display_addrinfo(struct addrinfo*);
 void talk_to_client(int);
 
+void* execute_game(void*);
+void* query_player_worker(void*);
+
 void stop_server(int);
 void install_handlers();
 int is_active_server = 1;
+
+struct clients {
+    int fd1;
+    int fd2;
+};
+
+struct query_player_work_data {
+    int pfd;
+    struct ttt_game* game;
+    trans_code ret_tcode;
+};
 
 
 int run_server(char* ip_address, char* port) {
@@ -38,8 +52,8 @@ int run_server(char* ip_address, char* port) {
     struct sockaddr_storage client_addr;
     socklen_t client_addr_size;
     int client_sockfd;
-
-    struct ttt_game game = new_game();
+    
+    int standby_clientfd = 0;
     trans_code tcode;
 
     while(is_active_server) {
@@ -51,28 +65,50 @@ int run_server(char* ip_address, char* port) {
             continue;
         }
 
-        printf("Received client with fd value %d\n", client_sockfd);
+        printf("Received client, assigned to fd %d\n", client_sockfd);
+
+        if (standby_clientfd == 0) {
+            standby_clientfd = client_sockfd;
+        } else {
+            pthread_t thid;
+
+            struct clients* clients = malloc(sizeof(struct clients));
+            clients->fd1 = client_sockfd;
+            clients->fd2 = standby_clientfd;
+            
+            printf("Clients at sockets %d and %d have been paired to a game\n", clients->fd1, clients->fd2);
+
+            if (pthread_create(&thid, NULL, execute_game, clients)) {
+                perror("pthread_create()");
+            }
+
+            standby_clientfd = 0;
+        }
 
         /////////////////////
         // Modularize this //
         /////////////////////
 
-        tcode = process_new_player(client_sockfd, &game);
-        if (tcode != TRANS_OK) {
-            printf("There were problems with the client at socket %d. Disconnecting...", client_sockfd);
-            close(client_sockfd);
-        }
+        // Create data bundle with player, returned tcode
+        // Run worker to process new player with data
+        // Once worker is complete, extract player data into an available game
 
-        printf("The current game has %d players\n", num_players(game));
+        // tcode = process_new_player(client_sockfd, &game);
+        // if (tcode != TRANS_OK) {
+        //     printf("There were problems with the client at socket %d. Disconnecting...", client_sockfd);
+        //     close(client_sockfd);
+        // }
 
-        if (num_players(game) == 2) {
-            printf("Players at ports %d and %d have been matched to a game.\n", game.p1.fd, game.p2.fd);
-            tcode = moderate_game(game);
-            printf("Game has conclude. Performing post-game cleanup\n");
-            post_game_cleanup(game);
-            game = new_game();
-            printf("Cleanup complete. Free to wait for new players to join\n");
-        }
+        // printf("The current game has %d players\n", num_players(game));
+
+        // if (num_players(game) == 2) {
+        //     printf("Players at ports %d and %d have been matched to a game.\n", game.p1.fd, game.p2.fd);
+        //     tcode = moderate_game(game);
+        //     printf("Game has conclude. Performing post-game cleanup\n");
+        //     post_game_cleanup(game);
+        //     game = new_game();
+        //     printf("Cleanup complete. Free to wait for new players to join\n");
+        // }
 
         /////////////////////
         /////////////////////
@@ -84,6 +120,64 @@ int run_server(char* ip_address, char* port) {
         close(conn_sockfd);
     }
 
+    return 0;
+}
+
+
+void* execute_game(void* _args) {
+    // Extract info from _args
+    struct clients clients = *((struct clients*)_args);
+    int cfd1 = clients.fd1;
+    int cfd2 = clients.fd2;
+    free(_args);
+
+    struct ttt_game game = new_game(cfd1, cfd2);
+
+    // Initialize threads for querying player names
+    pthread_t p1_thread, p2_thread;
+    trans_code tcode1, tcode2;
+    struct query_player_work_data p1_data = {cfd1, &game, tcode1};
+    struct query_player_work_data p2_data = {cfd2, &game, tcode2};
+
+    // Query players for names in parallel
+    if (  pthread_create(&p1_thread, NULL, query_player_worker, &p1_data) || 
+          pthread_create(&p2_thread, NULL, query_player_worker, &p2_data)) {
+        perror("pthread_create()");
+        return NULL;
+    }
+
+    // Wait until both players have finished submitting their names
+    int jc1 = pthread_join(p1_thread, NULL);
+    int jc2 = pthread_join(p2_thread, NULL);
+    if (jc1 || jc2) {
+        perror("pthread_join()");
+        return NULL;
+    }
+
+    printf("Completed name collection. Current players: \n");
+    display_player(game.p1);
+    display_player(game.p2);
+
+    moderate_game(game);
+
+    // clients->ret_tcode = moderate_game(game);
+    // post_game_cleanup(game);
+
+    return NULL;
+}
+
+void* query_player_worker(void* _args) {
+    struct query_player_work_data* args = (struct query_player_work_data*) _args;
+    printf("Inside query_player_worker for player at port %d\n", args->pfd);
+
+    struct player* p;
+    if (args->game->p1.fd == args->pfd) {
+        p = &(args->game->p1);
+    } else {
+        p = &(args->game->p2);
+    }
+
+    args->ret_tcode = query_player_info(p, args->game);
     return 0;
 }
 

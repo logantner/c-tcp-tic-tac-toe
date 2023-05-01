@@ -16,7 +16,7 @@ struct ttt_game {
 };
 
 // Game and board functions
-struct ttt_game new_game();
+struct ttt_game new_game(int, int);
 char get_board_val(struct ttt_game, int, int);
 void set_board_val(struct ttt_game*, int, int, char);
 char* get_win_status(struct ttt_game);
